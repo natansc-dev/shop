@@ -1,20 +1,72 @@
+import { GetServerSideProps } from "next";
+import Head from "next/head";
+import Image from "next/image";
 import Link from "next/link";
+import Stripe from "stripe";
+import { stripe } from "../lib/stripe";
 import { SuccessContainer, ImageContainer } from "../styles/pages/success";
 
-export default function Success() {
+interface SuccessProps {
+  customer_name: string,
+  product: {
+    name: string,
+    image_url: string
+  }
+}
+
+export default function Success({ customer_name, product }: SuccessProps) {
   return (
-    <SuccessContainer>
-      <h1>Sucesso!</h1>
+    <>
+      <Head>
+        <title>Compra efetuada | Ignite Shop</title>
 
-      <ImageContainer>
+        <meta name="robots" content="noindex" />
+      </Head>
 
-      </ImageContainer>
+      <SuccessContainer>
+        <h1>Sucesso!</h1>
 
-      <p>Uhuul <strong>Diego Fernandes</strong>, sua <strong>Camiseta Beyond the Limits</strong> já está a caminho da sua casa. </p>
+        <ImageContainer>
+          <Image src={product.image_url} alt={""} width={120} height={110} />
+        </ImageContainer>
 
-      <Link href="/">
-        Voltar ao catálogo
-      </Link>
-    </SuccessContainer>
+        <p>Uhuul <strong>{customer_name}</strong>, sua <strong>{product.name}</strong> já está a caminho da sua casa. </p>
+
+        <Link href="/">
+          Voltar ao catálogo
+        </Link>
+      </SuccessContainer>
+    </>
   )
+}
+
+export const getServerSideProps: GetServerSideProps = async ({ query }) => {
+  if (!query.session_id) {
+    return {
+      redirect: {
+        destination: '/',
+        permanent: false,
+      }
+    }
+  }
+
+  const sessionId = String(query.session_id)
+
+  const session = await stripe.checkout.sessions.retrieve(sessionId, {
+    expand: ['line_items', 'line_items.data.price.product'],
+  })
+
+  const customerName = session.customer_details?.name
+
+  const product = session.line_items?.data[0].price?.product as Stripe.Product
+
+  return {
+    props: {
+      customer_name: customerName,
+      product: {
+        name: product.name,
+        image_url: product.images[0]
+      }
+    }
+  }
 }
